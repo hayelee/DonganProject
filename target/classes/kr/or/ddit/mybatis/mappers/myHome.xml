@@ -1,0 +1,408 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.dao.MyHomeDAO">
+	
+	<!-- 지도 좌표, 행정동 이름 받아오기 -->
+	<select id="selectDonganList" resultType="kr.or.ddit.vo.DonganVO" parameterType="hashMap">
+		select adm_nm, st_x(st_centroid(geom)) as x, st_y(st_centroid(geom)) as y
+		from dongan
+		where adm_nm  = #{admNm}
+	</select>
+
+	<!-- 현황 조회 -->
+	<select id="selectDonganChart" resultType="kr.or.ddit.vo.DonganVO" parameterType="hashMap">
+		SELECT 
+			s.adm_nm
+		   , COUNT(DISTINCT p.hos_id) AS hos_id
+		   , COUNT(DISTINCT p2.pharma_id) AS pharma_id
+		   , COUNT(DISTINCT m.mart_id) + COUNT(DISTINCT c.con_Id) AS mart_id
+	       , COUNT(DISTINCT pk.park_id) AS park_id
+	       , COUNT(DISTINCT sb.sub_id) AS sub_id
+	       , COUNT(DISTINCT b.bus_id) AS bus_id
+		FROM 
+			dongan s
+		LEFT JOIN hospital p ON ST_Contains(s.geom, p.geom)
+		LEFT JOIN pharmacy p2 ON ST_Contains(s.geom, p2.geom)
+		LEFT JOIN mart m ON ST_Contains(s.geom, m.geom)
+		LEFT JOIN convenience c ON ST_Contains(s.geom, c.geom)
+		LEFT JOIN park pk ON ST_Contains(s.geom, pk.geom)
+		LEFT JOIN subway sb ON ST_Contains(s.geom, sb.geom)
+		LEFT JOIN bus b ON ST_Contains(s.geom, b.geom)
+		WHERE s.adm_nm = #{admNm}
+		GROUP BY s.adm_nm
+	</select>
+	
+	<!-- 공원 현황 입력 -->
+	<insert id="insertPark" parameterType="kr.or.ddit.vo.ParkVO">
+		INSERT into park (park_id, park_nm, park_cate, park_addr, park_area)
+		VALUES(nextval('seq_park_id'),#{parkNm}, #{parkCate}, #{parkAddr}, #{parkArea})
+	</insert>
+	<!-- 마트 현황 입력 -->
+	<insert id="insertMart" parameterType="kr.or.ddit.vo.MartVO">
+		INSERT into mart (mart_id, mart_nm, mart_cate, mart_addr)
+		VALUES(nextval('seq_mart_id'), #{martNm}, #{martCate}, #{martAddr})
+	</insert>
+	<!-- 병원 현황 입력 -->
+	<insert id="insertHos" parameterType="kr.or.ddit.vo.HospitalVO">
+		INSERT into hospital (hos_id, dutyname, dutydivnam, dutytel, dutyaddr)
+		VALUES(nextval('seq_hos_id'), #{dutyName}, #{dutyDivNam}, #{dutyAddr})
+	</insert>
+	<!-- 약국 현황 입력 -->
+	<insert id="insertPharma" parameterType="kr.or.ddit.vo.pharmacyVO">
+		INSERT into pharmacy (pharmaId, dutyname, dutyaddr, dutytel1)
+		VALUES(nextval('seq_pharma_id'), #{dutyName}, #{dutyAddr}, #{dutyTel1})
+	</insert>
+	
+	<!-- 공원 현황 조회 -->
+	<select id="selectPark" resultType="kr.or.ddit.vo.ParkVO" parameterType="hashMap">
+		SELECT p.park_id, p.park_nm , p.park_addr , p.park_tel, p.park_area 
+		FROM dongan d
+		JOIN park p ON ST_Contains(d.geom, p.geom)
+		WHERE d.adm_nm = #{admNm}
+		ORDER BY p.park_area 
+	</select>
+	
+	<!-- 마트 현황 조회 -->
+	<select id="selectMart" resultType="kr.or.ddit.vo.MartVO" parameterType="hashMap">
+		SELECT c.con_id, c.fclty_nm, c.fclty_ty, c.adres  
+		FROM dongan d
+		JOIN convenience c ON ST_Contains(d.geom, c.geom)
+		WHERE d.adm_nm = #{admNm}
+		UNION ALL
+		SELECT m.mart_id, m.mart_nm, m.mart_cate, m.mart_addr 
+		FROM dongan d
+		JOIN mart m ON ST_Contains(d.geom, m.geom)
+		WHERE d.adm_nm = #{admNm}
+		ORDER BY 1
+	</select>
+	
+	<!-- 병원 현황 조회 -->
+	<select id="selectHos" resultType="kr.or.ddit.vo.HospitalVO" parameterType="hashMap">
+		SELECT h.hos_id, h.dutyname, h.dutydivnam, h.dutyaddr, h.dutytel  
+		FROM dongan d
+		JOIN hospital h ON ST_Contains(d.geom, h.geom)
+		WHERE d.adm_nm = #{admNm}
+		ORDER BY 1
+	</select>
+	
+	<!-- 약국 현황 조회 -->
+	<select id="selectPharma" resultType="kr.or.ddit.vo.pharmacyVO" parameterType="hashMap">
+		SELECT p.pharma_id, p.dutyname, p.dutyaddr, p.dutytel1  
+		FROM dongan d
+		JOIN pharmacy p ON ST_Contains(d.geom, p.geom)
+		WHERE d.adm_nm = #{admNm}
+		ORDER BY 1
+	</select>
+	<!-- 공원 현황 삭제 -->
+	<delete id="deletePark" parameterType="kr.or.ddit.vo.ParkVO">
+		DELETE
+		FROM
+			park
+		WHERE
+			park_id = #{parkId}
+	</delete>
+	<!-- 마트 현황 삭제 -->
+	<delete id="deleteCon" parameterType="kr.or.ddit.vo.ConvenienceVO">
+		DELETE
+		FROM
+			convenience
+		WHERE
+			con_id = #{conId}
+	</delete>
+	<!-- 병원 현황 삭제 -->
+	<delete id="deleteHos" parameterType="kr.or.ddit.vo.HospitalVO">
+		DELETE
+		FROM
+			hospital
+		WHERE
+			hos_id = #{hosId}
+	</delete>
+	<!-- 약국 현황 삭제 -->
+	<delete id="deletePharma" parameterType="kr.or.ddit.vo.pharmacyVO">
+		DELETE
+		FROM
+			pharmacy
+		WHERE
+			pharma_id = #{pharmaId}
+	</delete>
+	
+	<!-- 요소 선택 -->
+	<insert id="insertMyYoso" parameterType="kr.or.ddit.vo.SelectElementVO">
+		INSERT INTO select_element (se_no, se_dwlling, se_influ, se_big_price, se_monthly_price, se_dong_nm)
+		VALUES (nextval('se_se_no_seq'), #{seDwlling}, #{seInflu}, #{seBigPrice}, #{seMonthlyPrice}, #{seDongNm})
+	</insert>
+	<!-- 요소 조회 -->
+	<select id="selectYoso" resultType="kr.or.ddit.vo.SelectElementVO">
+		SELECT se_no, se_monthly_price, se_influ, se_dwlling, se_dong_nm, se_big_price 
+		FROM select_element
+		ORDER BY 1 DESC;
+	</select>
+	<!-- 요소 삭제 -->
+	<delete id="deletYoso" parameterType="kr.or.ddit.vo.SelectElementVO">
+		DELETE
+		FROM
+			select_element
+		WHERE
+			se_no = #{seNo}
+	</delete>
+	
+	<!-- 아파트+공원+병원 분석 완료 -->
+	<select id="selectAptHos" resultType="kr.or.ddit.vo.SelectElementVO" parameterType="hashMap">
+		select
+			a.apt_id,
+			a.apt_dangi,
+			a.sgg_nm,
+			a.apt_addr,
+			a.apt_cate,
+			a.apt_big_pr,
+			a.apt_montly,
+			p.park_nm,
+			p.park_area,
+			a.x,
+			a.y,
+			a.apt_gubun,
+			COUNT(DISTINCT p.park_id) as park_id,
+			COUNT(DISTINCT h.hos_id) as hos_id
+		FROM apt a
+		LEFT JOIN park p ON ST_Contains(ST_Buffer(a.geom, 500) , p.geom)
+		LEFT JOIN hospital h ON ST_Contains(ST_Buffer(a.geom, 500), h.geom)
+		where ST_Contains((SELECT geom FROM dongan WHERE adm_nm = #{admNm}), a.geom)
+		and a.apt_gubun = #{aptGubun} 
+		AND apt_big_pr &lt;= CAST(#{aptBigPr} AS INTEGER)
+		AND apt_montly &lt;= CAST(#{aptMontly} AS INTEGER)
+		GROUP BY a.apt_id, a.apt_dangi, a.sgg_nm, a.apt_addr, a.apt_cate, p.park_nm, a.apt_big_pr, a.apt_montly, p.park_area, a.x, a.y, a.apt_gubun
+		ORDER BY p.park_area DESC, hos_id DESC
+	</select>
+	
+	<!-- 아파트+공원+대중교통 분석 완료 -->
+	<select id="selectAptBus" resultType="kr.or.ddit.vo.SelectElementVO" parameterType="hashMap">
+		select
+			a.apt_id,
+			a.apt_dangi,
+			a.sgg_nm,
+			a.apt_addr,
+			a.apt_cate,
+			a.apt_big_pr,
+			a.apt_montly,
+			p.park_nm,
+			p.park_area,
+			a.x,
+			a.y,
+			a.apt_gubun,
+			COUNT(DISTINCT p.park_id) as park_id,
+			COUNT(DISTINCT b.bus_id) as bus_id,
+			COUNT(DISTINCT s.sub_id) as sub_id
+		FROM apt a
+		LEFT JOIN park p ON ST_Contains(ST_Buffer(a.geom, 500) , p.geom)
+		LEFT JOIN bus b ON ST_Contains(ST_Buffer(a.geom, 500), b.geom)
+		LEFT JOIN subway s ON ST_Contains(ST_Buffer(a.geom, 500), s.geom)
+		WHERE ST_Contains((SELECT geom FROM dongan WHERE adm_nm = #{admNm}), a.geom)
+		and a.apt_gubun = #{aptGubun} 
+		AND apt_big_pr &lt;= CAST(#{aptBigPr} AS INTEGER)
+		AND apt_montly &lt;= CAST(#{aptMontly} AS INTEGER)
+		GROUP BY a.apt_id, a.apt_dangi, a.sgg_nm, a.apt_addr, a.apt_cate, a.apt_big_pr, a.apt_montly, p.park_nm, p.park_area, a.x, a.y, a.apt_gubun
+		ORDER BY p.park_area DESC, bus_id DESC
+	</select>
+	
+	<!-- 아파트+공원+마트 분석 완료 -->
+	<select id="selectAptMart" resultType="kr.or.ddit.vo.SelectElementVO" parameterType="hashMap">
+		select
+			a.apt_id,
+			a.apt_dangi,
+			a.sgg_nm,
+			a.apt_addr,
+			a.apt_cate,
+			a.apt_big_pr,
+			a.apt_montly,
+			p.park_nm,
+			p.park_area,
+			a.x,
+			a.y,
+			a.apt_gubun,
+			COUNT(DISTINCT p.park_id) as park_id,
+			COUNT(DISTINCT c.con_id) as con_id,
+			COUNT(DISTINCT m.mart_id) as mart_id
+		FROM apt a
+		LEFT JOIN park p ON ST_Contains(ST_Buffer(a.geom, 500) , p.geom)
+		LEFT JOIN convenience c ON ST_Contains(ST_Buffer(a.geom, 500), c.geom)
+		LEFT JOIN mart m ON ST_Contains(ST_Buffer(a.geom, 500), m.geom)
+		WHERE ST_Contains((SELECT geom FROM dongan WHERE adm_nm = #{admNm}), a.geom)
+		and a.apt_gubun = #{aptGubun}
+		AND apt_big_pr &lt;= CAST(#{aptBigPr} AS INTEGER)
+		AND apt_montly &lt;= CAST(#{aptMontly} AS INTEGER)
+		GROUP BY a.apt_id, a.apt_dangi, a.sgg_nm, a.apt_addr, a.apt_cate, a.apt_big_pr, a.apt_montly, p.park_nm, p.park_area, a.x, a.y, a.apt_gubun
+		ORDER BY p.park_area DESC, con_id DESC
+	</select>
+	
+<!-- 	/*오피스텔+공원+마트 분석하는 쿼리*/ -->
+	<select id="selectOpMart" resultType="kr.or.ddit.vo.SelectElementVO" parameterType="hashMap">
+		select
+			o.op_id, 
+			o.op_dangi,
+			o.sgg_nm,
+			o.op_addr,
+			o.op_cate,
+			o.op_big_pri,
+			o.op_montly_,
+			p.park_nm,
+			p.park_area,
+			o.x,
+			o.y,
+			o.op_gubun,
+			COUNT(DISTINCT p.park_id) as park_id,
+			COUNT(DISTINCT c.con_id) as con_id,
+			COUNT(DISTINCT m.mart_id) as mart_id
+		FROM op o
+		LEFT JOIN park p ON ST_Contains(ST_Buffer(o.geom, 500) , p.geom)
+		LEFT JOIN convenience c ON ST_Contains(ST_Buffer(o.geom, 500), c.geom)
+		LEFT JOIN mart m ON ST_Contains(ST_Buffer(o.geom, 500), m.geom)
+		WHERE ST_Contains((SELECT geom FROM dongan WHERE adm_nm = #{admNm}), o.geom)
+		and o.op_gubun = #{opGubun}
+		AND op_big_pri &lt;= CAST(#{opBigPri} AS INTEGER)
+		AND op_montly_ &lt;= CAST(#{opMontly_} AS FLOAT)
+		GROUP BY o.op_id, o.op_dangi, o.sgg_nm, o.op_addr, o.op_cate, o.op_big_pri, o.op_montly_, p.park_nm, p.park_area, o.x, o.y, o.op_gubun
+		ORDER BY p.park_area desc, con_id desc
+	</select>
+
+	<!-- /*오피스텔+공원+병원 분석하는 쿼리*/ -->
+	<select id="selectOpHos" resultType="kr.or.ddit.vo.SelectElementVO" parameterType="hashMap"> 
+		select
+			o.op_id, 
+			o.op_dangi,
+			o.sgg_nm,
+			o.op_addr,
+			o.op_cate,
+			o.op_big_pri,
+			o.op_montly_,
+			p.park_nm,
+			p.park_area,
+			o.x,
+			o.y,
+			o.op_gubun,
+			COUNT(DISTINCT p.park_id) as park_id,
+			COUNT(DISTINCT h.hos_id) as hos_id
+		FROM op o
+		LEFT JOIN park p ON ST_Contains(ST_Buffer(o.geom, 500) , p.geom)
+		LEFT JOIN hospital h ON ST_Contains(ST_Buffer(o.geom, 500), h.geom)
+		WHERE ST_Contains((SELECT geom FROM dongan WHERE adm_nm = #{admNm}), o.geom)
+		and o.op_gubun = #{opGubun}
+		AND op_big_pri &lt;= CAST(#{opBigPri} AS INTEGER)
+		AND op_montly_ &lt;= CAST(#{opMontly_} AS FLOAT)
+		GROUP BY o.op_id, o.op_dangi, o.sgg_nm, o.op_addr, o.op_cate, o.op_big_pri, o.op_montly_, p.park_nm, p.park_area, o.x, o.y, o.op_gubun
+		ORDER BY p.park_area desc, hos_id desc
+	</select>
+	<!-- /*오피스텔+공원+대중교통 분석하는 쿼리*/ -->
+	<select id="selectOpBus" resultType="kr.or.ddit.vo.SelectElementVO" parameterType="hashMap">
+		select
+			o.op_id, 
+			o.op_dangi,
+			o.sgg_nm,
+			o.op_addr,
+			o.op_cate,
+			o.op_big_pri,
+			o.op_montly_,
+			p.park_nm,
+			p.park_area,
+			o.x,
+			o.y,
+			o.op_gubun,
+		COUNT(DISTINCT p.park_id) as park_id,
+		COUNT(DISTINCT b.bus_id) as bus_id,
+		COUNT(DISTINCT s.sub_id) as sub_id
+		FROM op o
+		LEFT JOIN park p ON ST_Contains(ST_Buffer(o.geom, 500) , p.geom)
+		LEFT JOIN bus b ON ST_Contains(ST_Buffer(o.geom, 500), b.geom)
+		LEFT join subway s ON ST_Contains(ST_Buffer(o.geom, 500), s.geom)
+		WHERE ST_Contains((SELECT geom FROM dongan WHERE adm_nm = #{admNm}), o.geom)
+		and o.op_gubun = #{opGubun}
+		AND op_big_pri &lt;= CAST(#{opBigPri} AS INTEGER)
+		AND op_montly_ &lt;= CAST(#{opMontly_} AS FLOAT)
+		GROUP BY o.op_id, o.op_dangi, o.sgg_nm, o.op_addr, o.op_cate, o.op_big_pri, o.op_montly_, p.park_nm, p.park_area, o.x, o.y, o.op_gubun
+		ORDER BY p.park_area desc, bus_id desc
+	</select>
+	
+<!-- 	/*다세대+공원+대중교통 분석하는 쿼리*/ -->
+	<select id="selectDaBus" resultType="kr.or.ddit.vo.SelectElementVO" parameterType="hashMap">
+		select
+			d.da_id,
+			d.da_build_n,
+			d.sgg_nm,
+			d.da_addr,
+			d.da_cate,
+			d.da_big_pri,
+			d.da_montly_,
+			p.park_nm,
+			p.park_area,
+			d.x,
+			d.y,
+			d.da_gubun,
+		COUNT(DISTINCT p.park_id) as park_id,
+		COUNT(DISTINCT b.bus_id) as bus_id,
+		COUNT(DISTINCT s.sub_id) as sub_id
+		FROM dasede d
+		LEFT JOIN park p ON ST_Contains(ST_Buffer(d.geom, 500) , p.geom)
+		LEFT JOIN bus b ON ST_Contains(ST_Buffer(d.geom, 500), b.geom)
+		LEFT join subway s ON ST_Contains(ST_Buffer(d.geom, 500), s.geom)
+		WHERE ST_Contains((SELECT geom FROM dongan WHERE adm_nm = #{admNm}), d.geom)
+		and d.da_gubun = #{daGubun}
+		AND da_big_pri &lt;= CAST(#{daBigPri} AS INTEGER)
+		AND da_montly_ &lt;= CAST(#{daMontly_} AS INTEGER)
+		GROUP BY d.da_id, d.da_build_n, d.sgg_nm, d.da_addr, d.da_cate, d.da_big_pri, d.da_montly_, p.park_nm, p.park_area, d.x, d.y, d.da_gubun
+		ORDER BY p.park_area desc, bus_id desc
+	</select>
+<!-- 		/*다세대+공원+마트 분석하는 쿼리*/ -->
+	<select id="selectDaMart" resultType="kr.or.ddit.vo.SelectElementVO" parameterType="hashMap">
+		select
+			d.da_id,
+			d.da_build_n,
+			d.sgg_nm,
+			d.da_addr,
+			d.da_cate,
+			d.da_big_pri,
+			d.da_montly_,
+			p.park_nm,
+			p.park_area,
+			d.x,
+			d.y,
+			d.da_gubun,
+		COUNT(DISTINCT p.park_id) as park_id,
+		COUNT(DISTINCT m.mart_id) as mart_id,
+		COUNT(DISTINCT c.con_id) as con_id
+		FROM dasede d
+		LEFT JOIN park p ON ST_Contains(ST_Buffer(d.geom, 500) , p.geom)
+		LEFT JOIN convenience c ON ST_Contains(ST_Buffer(d.geom, 500), c.geom)
+		LEFT join mart m ON ST_Contains(ST_Buffer(d.geom, 500), m.geom)
+		WHERE ST_Contains((SELECT geom FROM dongan WHERE adm_nm = #{admNm}), d.geom)
+		and d.da_gubun = #{daGubun}
+		AND da_big_pri &lt;= CAST(#{daBigPri} AS INTEGER)
+		AND da_montly_ &lt;= CAST(#{daMontly_} AS INTEGER)
+		GROUP BY d.da_id, d.da_build_n, d.sgg_nm, d.da_addr, d.da_cate, d.da_big_pri, d.da_montly_, p.park_nm, p.park_area, d.x, d.y, d.da_gubun
+		ORDER BY p.park_area desc, con_id desc
+	</select>
+<!-- 		/*다세대+공원+병원 분석하는 쿼리*/ -->
+	<select id="selectDaHos" resultType="kr.or.ddit.vo.SelectElementVO" parameterType="hashMap">
+		select
+			d.da_id,
+			d.da_build_n,
+			d.sgg_nm,
+			d.da_addr,
+			d.da_cate,
+			d.da_big_pri,
+			d.da_montly_,
+			p.park_nm,
+			p.park_area,
+			d.x,
+			d.y,
+			d.da_gubun,
+		COUNT(DISTINCT h.hos_id) as hos_id
+		FROM dasede d
+		LEFT JOIN park p ON ST_Contains(ST_Buffer(d.geom, 500) , p.geom)
+		LEFT JOIN hospital h ON ST_Contains(ST_Buffer(d.geom, 500), h.geom)
+		WHERE ST_Contains((SELECT geom FROM dongan WHERE adm_nm =#{admNm}), d.geom)
+		and d.da_gubun = #{daGubun}
+		AND da_big_pri &lt;= CAST(#{daBigPri} AS INTEGER)
+		AND da_montly_ &lt;= CAST(#{daMontly_} AS INTEGER)
+		GROUP BY d.da_id, d.da_build_n, d.sgg_nm, d.da_addr, d.da_cate, d.da_big_pri, d.da_montly_, p.park_nm, p.park_area, d.x, d.y, d.da_gubun
+		ORDER BY p.park_area desc, hos_id desc
+	</select>
+</mapper>
